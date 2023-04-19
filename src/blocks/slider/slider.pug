@@ -1,0 +1,16 @@
+//- Все примеси в этом файле должны начинаться c имени блока (slider)
+
+mixin slider(props={}, mods)
+
+  -
+    //- список модификаторов
+    var allMods = '';
+    if(typeof(mods) === 'string') {
+      var modsList = mods.split(',');
+
+      for (var i = 0; i < modsList.length; i++) {
+        allMods = allMods + ' alert--' + modsList[i].trim();
+      }
+    }
+
+  .slider__wrapper(class=allMods, role='alert')&attributes(attributes)

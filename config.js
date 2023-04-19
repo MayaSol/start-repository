@@ -13,6 +13,8 @@ let config = {
     // 'object-fit-polyfill',
   ],
   'addStyleBefore': [
+    'src/scss/_tailwind-colours.scss',
+    'src/scss/_tailwind-screens.scss',
     'src/scss/variables.scss',
     'src/scss/mixins.scss',
     // 'somePackage/dist/somePackage.css', // для 'node_modules/somePackage/dist/somePackage.css',

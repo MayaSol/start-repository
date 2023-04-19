@@ -21,13 +21,13 @@ const rename = require('gulp-rename');
 const getClassesFromHtml = require('get-classes-from-html');
 const browserSync = require('browser-sync').create();
 const debug = require('gulp-debug');
-const sass = require('gulp-sass');
+const sass = require('gulp-sass')(require('sass'));
 const webpackStream = require('webpack-stream');
 const buffer = require('vinyl-buffer');
 const postcss = require('gulp-postcss');
+const atImport = require("postcss-import");
 const autoprefixer = require("autoprefixer");
 const mqpacker = require("css-mqpacker");
-const atImport = require("postcss-import");
 const csso = require('gulp-csso');
 const inlineSVG = require('postcss-inline-svg');
 const objectFitImages = require('postcss-object-fit-images');
@@ -41,9 +41,16 @@ const prettyHtml = require('gulp-pretty-html');
 const replace = require('gulp-replace');
 const ghpages = require('gh-pages');
 const path = require('path');
+const tailwindcss = require('tailwindcss');
+const concat = require('gulp-concat');
+const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const imageminJpegtran = require('imagemin-jpegtran');
+const imageminPngquant = require('imagemin-pngquant');
+// import imagemin from 'imagemin';
 
 // Глобальные настройки этого запуска
-const buildLibrary = process.env.BUILD_LIBRARY == 'yes' ? true : false;
+// const buildLibrary = process.env.BUILD_LIBRARY == 'yes' ? true : false;
+const buildLibrary = true;
 const nth = {};
 nth.config = require('./config.js');
 nth.blocksFromHtml = Object.create(nth.config.alwaysAddBlocks); // блоки из конфига сразу добавим в список блоков
@@ -69,11 +76,12 @@ let prettyOption = {
 
 // Список и настройки плагинов postCSS
 let postCssPlugins = [
-  autoprefixer({grid: true}),
-  mqpacker({
-    sort: true
-  }),
   atImport(),
+  tailwindcss(),
+  autoprefixer({ grid: true }),
+  // mqpacker({
+  //   sort: true
+  // }),
   inlineSVG(),
   objectFitImages(),
 ];
@@ -81,7 +89,7 @@ let postCssPlugins = [
 
 function writePugMixinsFile(cb) {
   let allBlocksWithPugFiles = getDirectories('pug');
-  let pugMixins = '//-' + doNotEditMsg.replace(/\n /gm,'\n  ');
+  let pugMixins = '//-' + doNotEditMsg.replace(/\n /gm, '\n  ');
   allBlocksWithPugFiles.forEach(function(blockName) {
     pugMixins += `include ${dir.blocks.replace(dir.src,'../')}${blockName}/${blockName}.pug\n`;
   });
@@ -95,15 +103,15 @@ function compilePug() {
   const fileList = [
     `${dir.src}pages/**/*.pug`
   ];
-  if(!buildLibrary) fileList.push(`!${dir.src}pages/blocks-demo.pug`);
+  if (!buildLibrary) fileList.push(`!${dir.src}pages/blocks-demo.pug`);
   return src(fileList)
     .pipe(plumber({
-      errorHandler: function (err) {
+      errorHandler: function(err) {
         console.log(err.message);
         this.emit('end');
       }
     }))
-    .pipe(debug({title: 'Compiles '}))
+    .pipe(debug({ title: 'Compiles ' }))
     .pipe(pug(pugOption))
     .pipe(prettyHtml(prettyOption))
     .pipe(replace(/^(\s*)(<button.+?>)(.*)(<\/button>)/gm, '$1$2\n$1  $3\n$1$4'))
@@ -119,15 +127,15 @@ function compilePugFast() {
   const fileList = [
     `${dir.src}pages/**/*.pug`
   ];
-  if(!buildLibrary) fileList.push(`!${dir.src}pages/blocks-demo.pug`);
+  if (!buildLibrary) fileList.push(`!${dir.src}pages/blocks-demo.pug`);
   return src(fileList, { since: lastRun(compilePugFast) })
     .pipe(plumber({
-      errorHandler: function (err) {
+      errorHandler: function(err) {
         console.log(err.message);
         this.emit('end');
       }
     }))
-    .pipe(debug({title: 'Compiles '}))
+    .pipe(debug({ title: 'Compiles ' }))
     .pipe(pug(pugOption))
     .pipe(prettyHtml(prettyOption))
     .pipe(replace(/^(\s*)(<button.+?>)(.*)(<\/button>)/gm, '$1$2\n$1  $3\n$1$4'))
@@ -153,64 +161,133 @@ function copyImg(cb) {
   let copiedImages = [];
   nth.blocksFromHtml.forEach(function(block) {
     let src = `${dir.blocks}${block}/img`;
-    if(fileExist(src)) copiedImages.push(src);
+    if (fileExist(src)) copiedImages.push(src);
   });
   nth.config.alwaysAddBlocks.forEach(function(block) {
     let src = `${dir.blocks}${block}/img`;
-    if(fileExist(src)) copiedImages.push(src);
+    if (fileExist(src)) copiedImages.push(src);
   });
-  if(copiedImages.length) {
+  if (copiedImages.length) {
     (async () => {
       await cpy(copiedImages, `${dir.build}img`);
       cb();
     })();
-  }
-  else {
+  } else {
     cb();
   }
 }
 exports.copyImg = copyImg;
 
+// function minifyImgs(cb) {
+//   let minifyImgs = [];
+//   nth.blocksFromHtml.forEach(function(block) {
+//     let src = `${dir.blocks}${block}/img`;
+//     if (fileExist(src)) minifyImgs.push(src);
+//   });
+//   nth.config.alwaysAddBlocks.forEach(function(block) {
+//     let src = `${dir.blocks}${block}/img`;
+//     if (fileExist(src)) minifyImgs.push(src);
+//   });
+//   if (minifyImgs.length) {
+//     for (let src of minifyImgs) {
+//       (async () => {
+//         await imagemin(src, {
+//           destination: src,
+//           plugins: [
+//             imageminJpegtran(),
+//             imageminPngquant({
+//               quality: [0.6, 0.8]
+//             })
+//           ]
+//         });
+//       })();
+//     }
+//     cb();
+//   }
+//   else {
+//     cb();
+//   }
+// }
+// exports.minifyImgs = minifyImgs;
+
+
+function minifyImgs(cb) {
+  (async () => {
+     const files = await imagemin(['src/img/*.{png,jpg}'], {
+      destination: 'src/img/test/',
+      plugins: [
+        imageminJpegtran(),
+        imageminPngquant({
+          quality: [0.6, 0.8]
+        })
+      ]
+    });
+       // console.log(files);
+
+  })();
+  cb();
+}
+exports.minifyImgs = minifyImgs;
+
 
 function generateSvgSprite(cb) {
   let spriteSvgPath = `${dir.blocks}sprite-svg/svg/`;
-  if(nth.config.alwaysAddBlocks.indexOf('sprite-svg') > -1 && fileExist(spriteSvgPath)) {
+  if (nth.config.alwaysAddBlocks.indexOf('sprite-svg') > -1 && fileExist(spriteSvgPath)) {
     return src(spriteSvgPath + '*.svg')
-      .pipe(svgmin(function () {
-        return { plugins: [{ cleanupIDs: { minify: true } }] }
-      }))
+      // .pipe(svgmin(function() {
+      //   return { plugins: [
+      //     { cleanupIDs: { minify: true } },
+      //     { removeViewBox: { active: false } }
+      //   ]}
+      // }))
       .pipe(svgstore({ inlineSvg: true }))
       .pipe(rename('sprite.svg'))
       .pipe(dest(`${dir.blocks}sprite-svg/img/`));
-  }
-  else {
+  } else {
     cb();
   }
 }
 exports.generateSvgSprite = generateSvgSprite;
 
 
+function generateInlineSvgSprite(cb) {
+  let spriteSvgPath = `${dir.blocks}sprite-svg-inline/svg/`;
+  if (nth.config.alwaysAddBlocks.indexOf('sprite-svg-inline') > -1 && fileExist(spriteSvgPath)) {
+    return src(spriteSvgPath + '*.svg')
+      .pipe(svgmin(function() {
+        return { plugins: [{ cleanupIDs: { minify: true } }] }
+      }))
+      .pipe(svgstore({ inlineSvg: true }))
+      .pipe(rename('sprite-inline.svg'))
+      .pipe(dest(`${dir.blocks}sprite-svg-inline/img/`));
+  } else {
+    cb();
+  }
+}
+exports.generateInlineSvgSprite = generateInlineSvgSprite;
+
+
 function generatePngSprite(cb) {
   let spritePngPath = `${dir.blocks}sprite-png/png/`;
-  if(nth.config.alwaysAddBlocks.indexOf('sprite-png') > -1 && fileExist(spritePngPath)) {
+  if (nth.config.alwaysAddBlocks.indexOf('sprite-png') > -1 && fileExist(spritePngPath)) {
     del(`${dir.blocks}sprite-png/img/*.png`);
-    let fileName = 'sprite-' + Math.random().toString().replace(/[^0-9]/g, '') + '.png';
+    let fileName = 'sprite.png';
     let spriteData = src(spritePngPath + '*.png')
       .pipe(spritesmith({
         imgName: fileName,
         cssName: 'sprite-png.scss',
         padding: 4,
-        imgPath: '../img/' + fileName
+        imgPath: '../img/' + fileName,
+        cssTemplate: 'handlebarsStrDefault.css.handlebars',
       }));
     let imgStream = spriteData.img
       .pipe(buffer())
-      .pipe(imagemin([ imagemin.optipng({ optimizationLevel: 5 }) ]))
+      .pipe(imagemin([imagemin.optipng({ optimizationLevel: 5 })]))
       .pipe(dest(`${dir.blocks}sprite-png/img/`));
     let cssStream = spriteData.css
       .pipe(dest(`${dir.blocks}sprite-png/`));
     return merge(imgStream, cssStream);
-  }
-  else {
+  } else {
     cb();
   }
 }
@@ -219,6 +296,7 @@ exports.generatePngSprite = generatePngSprite;
 
 function writeSassImportsFile(cb) {
   const newScssImportsList = [];
+  newScssImportsList.push('tailwindcss/base');
   nth.config.addStyleBefore.forEach(function(src) {
     newScssImportsList.push(src);
   });
@@ -226,12 +304,14 @@ function writeSassImportsFile(cb) {
     if (fileExist(`${dir.blocks}${blockName}/${blockName}.scss`)) newScssImportsList.push(`${dir.blocks}${blockName}/${blockName}.scss`);
   });
   let allBlocksWithScssFiles = getDirectories('scss');
-  allBlocksWithScssFiles.forEach(function(blockWithScssFile){
+  allBlocksWithScssFiles.forEach(function(blockWithScssFile) {
     let url = `${dir.blocks}${blockWithScssFile}/${blockWithScssFile}.scss`;
     if (nth.blocksFromHtml.indexOf(blockWithScssFile) == -1) return;
     if (newScssImportsList.indexOf(url) > -1) return;
     newScssImportsList.push(url);
   });
+  newScssImportsList.push('tailwindcss/components');
+  newScssImportsList.push('tailwindcss/utilities');
   nth.config.addStyleAfter.forEach(function(src) {
     newScssImportsList.push(src);
   });
@@ -252,28 +332,81 @@ function writeSassImportsFile(cb) {
 exports.writeSassImportsFile = writeSassImportsFile;
 
 
+function clearCssDir() {
+  return del([
+    `${dir.src}css/input.css`,
+    `${dir.src}css/main.css`,
+    `${dir.src}css/main.css.map`,
+  ]);
+}
+exports.clearCssDir = clearCssDir;
+
+
 function compileSass() {
   const fileList = [
     `${dir.src}scss/style.scss`,
   ];
-  if(buildLibrary) fileList.push(`${dir.blocks}blocks-library/blocks-library.scss`);
+  if (buildLibrary) fileList.push(`${dir.blocks}blocks-library/blocks-library.scss`);
   return src(fileList, { sourcemaps: true })
     .pipe(plumber({
-      errorHandler: function (err) {
+      errorHandler: function(err) {
         console.log(err.message);
         this.emit('end');
       }
     }))
-    .pipe(debug({title: 'Compiles:'}))
-    .pipe(sass({includePaths: [__dirname+'/','node_modules']}))
+    .pipe(debug({ title: 'Compiles:' }))
+    .pipe(sass({ includePaths: [__dirname + '/', 'node_modules'] }))
     .pipe(postcss(postCssPlugins))
     .pipe(csso({
       restructure: false,
     }))
-    .pipe(dest(`${dir.build}/css`, { sourcemaps: '.' }))
+    .pipe(rename('style.css'))
+    .pipe(dest(`${dir.build}css`, { sourcemaps: '.' }))
     .pipe(browserSync.stream());
 }
 exports.compileSass = compileSass;
+
+
+function compileTailwind() {
+  let plugins = [
+    atImport(),
+    tailwindcss(),
+  ];
+  return src([`${dir.src}input.css`])
+    .pipe(plumber({
+      errorHandler: function(err) {
+        console.log(err);
+        console.log(err.message);
+        this.emit('end');
+      }
+    }))
+    .pipe(debug({ title: 'Compiles tailwindcss:' }))
+    .pipe(postcss(plugins))
+    .pipe(dest(`${dir.src}css`, { sourcemaps: '.' }))
+  // .pipe(browserSync.stream());
+}
+exports.compileTailwind = compileTailwind;
+
+
+function concatCss() {
+  return src([
+      `${dir.src}css/input.css`,
+      `${dir.src}css/regular.min.css`,
+      `${dir.src}css/solid.min.css`,
+      `${dir.src}css/fontawesome.min.css`
+    ])
+    .pipe(plumber({
+      errorHandler: function(err) {
+        console.log(err.message);
+        this.emit('end');
+      }
+    }))
+    .pipe(debug({ title: 'concatCss:' }))
+    .pipe(concat('style.css'))
+    .pipe(dest(`${dir.build}/css`, { sourcemaps: '.' }))
+    .pipe(browserSync.stream());
+}
+exports.concatCss = concatCss;
 
 
 function writeJsRequiresFile(cb) {
@@ -282,11 +415,11 @@ function writeJsRequiresFile(cb) {
     jsRequiresList.push(src);
   });
   const allBlocksWithJsFiles = getDirectories('js');
-  allBlocksWithJsFiles.forEach(function(blockName){
+  allBlocksWithJsFiles.forEach(function(blockName) {
     if (nth.config.alwaysAddBlocks.indexOf(blockName) == -1) return;
     jsRequiresList.push(`../blocks/${blockName}/${blockName}.js`)
   });
-  allBlocksWithJsFiles.forEach(function(blockName){
+  allBlocksWithJsFiles.forEach(function(blockName) {
     let src = `../blocks/${blockName}/${blockName}.js`
     if (nth.blocksFromHtml.indexOf(blockName) == -1) return;
     if (jsRequiresList.indexOf(src) > -1) return;
@@ -312,27 +445,63 @@ function buildJs() {
   const entryList = {
     'bundle': `./${dir.src}js/entry.js`,
   };
-  if(buildLibrary) entryList['blocks-library'] = `./${dir.blocks}blocks-library/blocks-library.js`;
+  if (buildLibrary) entryList['blocks-library'] = `./${dir.blocks}blocks-library/blocks-library.js`;
   return src(`${dir.src}js/entry.js`)
-    .pipe(plumber())
+    .pipe(plumber({
+      errorHandler: function(err) {
+        console.log(err.message);
+        this.emit('end');
+      }
+    }))
     .pipe(webpackStream({
-      mode: 'production',
+      mode: 'development',
       entry: entryList,
       output: {
         filename: '[name].js',
       },
       module: {
-        rules: [
+        rules: [{
+            test: /\.src\/input.css$/i,
+            exclude: /node_modules/,
+            use: [{
+                loader: MiniCssExtractPlugin.loader
+              },
+              {
+                loader: 'css-loader',
+                options: {
+                  importLoaders: 1,
+                  url: false
+                }
+              },
+              {
+                loader: 'postcss-loader',
+                options: {
+                  postcssOptions: {
+                    config: path.resolve(__dirname, 'postcss.config.js'),
+                  },
+                },
+              }
+            ]
+          },
           {
-            test: /\.(js)$/,
-            exclude: /(node_modules)/,
-            loader: 'babel-loader',
-            query: {
-              presets: ['@babel/preset-env']
+            test: /\.m?js$/,
+            exclude: /node_modules/,
+            use: {
+              loader: 'babel-loader',
+              options: {
+                presets: [
+                  ['@babel/preset-env', { targets: "defaults" }]
+                ]
+              }
             }
           }
         ]
       },
+      plugins: [
+        new MiniCssExtractPlugin({
+          filename: "css/test.css",
+        })
+      ],
       // externals: {
       //   jquery: 'jQuery'
       // }
@@ -340,6 +509,90 @@ function buildJs() {
     .pipe(dest(`${dir.build}js`));
 }
 exports.buildJs = buildJs;
+
+
+// These functions loop through the tailwind custom config objects set in your tailwind.config.js file and exposes them as variables in sass
+
+// Usage:
+// Just add these functions the gulpfile.js and then call writeTailwindToSass() in your task
+// change the file directories to whatever fits for your theme
+
+var tailwindConfig = require('./tailwind.config.js');
+
+function getTailwindScreens() {
+  let sass = `// This file is automatically generated, do not edit \n`;
+  for (let key in tailwindConfig.theme.screens) {
+    if (tailwindConfig.theme.screens.hasOwnProperty(key)) {
+      let value = tailwindConfig.theme.screens[key];
+      sass += `$screen-${key}: ${value}; \n`;
+      let container;
+      if (tailwindConfig.theme.container.padding.hasOwnProperty(key)) {
+        container = parseInt(tailwindConfig.theme.container.padding[key]);
+      } else {
+        container = parseInt(tailwindConfig.theme.container.padding['DEFAULT']);
+      }
+      sass += `$container-${key}: ${value}-${container}*2; \n`;
+    }
+  }
+  return sass;
+
+}
+
+function getTailwindColours() {
+  let sass = `// This file is automatically generated, do not edit \n`;
+  let colors = {};
+  colors = tailwindConfig.theme.colors({ colors });
+  let myColors = colors;
+  for (let key in myColors) {
+    if (myColors.hasOwnProperty(key)) {
+      let property = myColors[key];
+
+      if (typeof property === 'object' && property !== null) {
+        for (let subkey in property) {
+          if (property.hasOwnProperty(subkey)) {
+            let subvalue = property[subkey];
+            sass += `$tw-${key}-${subkey}: ${subvalue}; \n`;
+          }
+        }
+      } else {
+        sass += `$tw-${key}: ${property}; \n`;
+      }
+    }
+  }
+
+  return sass;
+}
+
+
+async function writeTailwindToSass() {
+  let screenData = getTailwindScreens();
+  fs.writeFile(`${dir.src}scss/_tailwind-screens.scss`, screenData, function(err, file) {
+    if (err) throw err;
+  })
+
+  let coloursData = getTailwindColours();
+  fs.writeFile(`${dir.src}scss/_tailwind-colours.scss`, coloursData, function(err, file) {
+    if (err) throw err;
+  })
+}
+
+exports.writeTailwindToSass = writeTailwindToSass;
+
+function minCss() {
+
+  return src('./initial/assets/css/meanmenu.css')
+    // .pipe(sourcemaps.init())
+    // .pipe(postcss([ autoprefixer({grid: 'autoplace'}) ]))
+    .pipe(csso({
+      restructure: false,
+    }))
+    .pipe(rename(function (path) {
+      path.extname = ".min.css";
+    }))
+    // .pipe(sourcemaps.write('.'))
+    .pipe(dest('initial/assets/css'))
+}
+exports.minCss = minCss;
 
 
 function clearBuildDir() {
@@ -376,13 +629,16 @@ function serve() {
   watch([`${dir.src}pages/**/*.pug`], { events: ['change', 'add'], delay: 100 }, series(
     compilePugFast,
     parallel(writeSassImportsFile, writeJsRequiresFile),
-    parallel(compileSass, buildJs),
+    compileSass,
+    buildJs,
+    // compileTailwind,
+    // concatCss,
     reload
   ));
 
   // Страницы: удаление
   watch([`${dir.src}pages/**/*.pug`], { delay: 100 })
-  // TODO попробовать с events: ['unlink']
+    // TODO попробовать с events: ['unlink']
     .on('unlink', function(path) {
       let filePathInBuildDir = path.replace(`${dir.src}pages/`, dir.build).replace('.pug', '.html');
       fs.unlink(filePathInBuildDir, (err) => {
@@ -394,6 +650,9 @@ function serve() {
   // Разметка Блоков: изменение
   watch([`${dir.blocks}**/*.pug`], { events: ['change'], delay: 100 }, series(
     compilePug,
+    compileSass,
+    // compileTailwind,
+    // concatCss,
     reload
   ));
 
@@ -401,6 +660,10 @@ function serve() {
   watch([`${dir.blocks}**/*.pug`], { events: ['add'], delay: 100 }, series(
     writePugMixinsFile,
     compilePug,
+    writeSassImportsFile,
+    compileSass,
+    // compileTailwind,
+    // concatCss,
     reload
   ));
 
@@ -412,23 +675,31 @@ function serve() {
     compilePug,
     parallel(writeSassImportsFile, writeJsRequiresFile),
     parallel(compileSass, buildJs),
+    // compileTailwind,
+    // concatCss,
     reload,
   ));
 
   // Стили Блоков: изменение
   watch([`${dir.blocks}**/*.scss`], { events: ['change'], delay: 100 }, series(
     compileSass,
+    // compileTailwind,
+    // concatCss
   ));
 
   // Стили Блоков: добавление
   watch([`${dir.blocks}**/*.scss`], { events: ['add'], delay: 100 }, series(
     writeSassImportsFile,
     compileSass,
+    // compileTailwind,
+    // concatCss
   ));
 
   // Стилевые глобальные файлы: все события
   watch([`${dir.src}scss/**/*.scss`, `!${dir.src}scss/style.scss`], { events: ['all'], delay: 100 }, series(
     compileSass,
+    // compileTailwind,
+    // concatCss
   ));
 
   // Скриптовые глобальные файлы: все события
@@ -453,6 +724,8 @@ function serve() {
     generatePngSprite,
     copyImg,
     compileSass,
+    // compileTailwind,
+    // concatCss,
     reload,
   ));
 }
@@ -460,17 +733,25 @@ function serve() {
 
 exports.build = series(
   parallel(clearBuildDir, writePugMixinsFile),
-  parallel(compilePugFast, copyAssets, generateSvgSprite, generatePngSprite),
+  parallel(compilePugFast, copyAssets, generateSvgSprite, generateInlineSvgSprite, generatePngSprite),
   parallel(copyImg, writeSassImportsFile, writeJsRequiresFile),
-  parallel(compileSass, buildJs),
+  clearCssDir,
+  writeTailwindToSass,
+  compileSass,
+  // compileTailwind,
+  buildJs,
+  // concatCss
 );
 
 
 exports.default = series(
   parallel(clearBuildDir, writePugMixinsFile),
-  parallel(compilePugFast, copyAssets, generateSvgSprite, generatePngSprite),
+  parallel(compilePugFast, copyAssets, generateSvgSprite, generateInlineSvgSprite, generatePngSprite),
   parallel(copyImg, writeSassImportsFile, writeJsRequiresFile),
-  parallel(compileSass, buildJs),
+  clearCssDir,
+  writeTailwindToSass,
+  compileSass,
+  buildJs,
   serve,
 );
 
@@ -513,7 +794,7 @@ function getClassesToBlocksList(file, enc, cb) {
       // Добавляем класс в список
       nth.blocksFromHtml.push(item);
     }
-    console.log('---------- Used HTML blocks: ' + nth.blocksFromHtml.join(', '));
+    // console.log('---------- Used HTML blocks: ' + nth.blocksFromHtml.join(', '));
     file.contents = new Buffer.from(fileContent);
   }
   this.push(file);
@@ -541,11 +822,11 @@ function filterShowCode(text, options) {
  * @param  {string} path      Путь до файла или папки
  * @return {boolean}
  */
-function fileExist(filepath){
+function fileExist(filepath) {
   let flag = true;
-  try{
+  try {
     fs.accessSync(filepath, fs.F_OK);
-  }catch(e){
+  } catch (e) {
     flag = false;
   }
   return flag;
@@ -571,5 +852,5 @@ function getDirectories(ext) {
  * @return {array}    Элементы, которые отличаются
  */
 function getArraysDiff(a1, a2) {
-  return a1.filter(i=>!a2.includes(i)).concat(a2.filter(i=>!a1.includes(i)))
+  return a1.filter(i => !a2.includes(i)).concat(a2.filter(i => !a1.includes(i)))
 }

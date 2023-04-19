@@ -1,0 +1,45 @@
+// В этом файле должны быть стили для БЭМ-блока phone, его элементов,
+// модификаторов, псевдоселекторов, псевдоэлементов, @media-условий...
+// Очередность: http://nicothin.github.io/idiomatic-pre-CSS/#priority
+
+.phone {
+
+  $block-name:                &; // #{$block-name}__element
+
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1;
+
+  a {
+    color: currentColor;
+    text-decoration: none;
+
+    &:hover {
+      color: currentColor;
+    }
+  }
+
+  &:hover,
+  &:focus {
+    color: currentColor;
+  }
+
+  &--top {
+    display: none;
+    // position: absolute;
+    // bottom: 0;
+    // padding-left: 48px;
+
+
+    @media (min-width: $screen-lg) {
+      // left: get-point(2, lg) - $screen-padding-lg;
+      display: block;
+    }
+
+    // @media (min-width: $screen-xl) {
+      // left: get-point(2, xl) - $screen-padding-xl;
+    //   display: block;
+    // }
+  }
+
+}

@@ -1,0 +1,28 @@
+//- Все примеси в этом файле должны начинаться c имени блока (svg)
+
+mixin svg(icon='', sizes=['30','30'],mods,inline=false)
+
+  -
+    // список модификаторов
+    var allMods = "";
+    if (!(typeof classes === "unefined") && classes ) {
+      allMods = classes;
+    }
+    if(typeof(mods) !== "undefined" && mods) {
+      var modsList = mods.split(",");
+      for (var i = 0; i < modsList.length; i++) {
+        allMods = allMods + " svg--" + modsList[i].trim();
+      }
+    }
+
+    var href = '';
+    if (inline) {
+      href = "#" + icon;
+    } else {
+      href = "/img/sprite.svg#" + icon;
+    }
+
+    const [width, height] = sizes;
+
+  svg(class=allMods width=width height=height aria-hidden='true' focusable='false')&attributes(attributes)
+    use(xlink:href=href)

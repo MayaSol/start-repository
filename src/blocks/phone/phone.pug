@@ -1,0 +1,18 @@
+//- Все примеси в этом файле должны начинаться c имени блока (phone)
+
+mixin phone(mods)
+
+  -
+   var allMods = '';
+   if(typeof(mods) !== 'undefined' && mods) {
+     var modsList = mods.split(',');
+     for (var i = 0; i < modsList.length; i++) {
+       allMods = allMods + ' phone--' + modsList[i].trim();
+     }
+   }
+
+  .phone(class=allMods)&attributes(attributes)
+    .phone__inner
+      a(href='tel:+74991102131') +7 (499) 110-21-31
+
+
